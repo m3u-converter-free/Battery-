@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battery Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #FFFFFF;
+            color: #000000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            padding: 10px;
+        }
+        
+        .battery-percentage {
+            font-size: 48vw; /* 56vw से कम करके 48vw */
+            font-weight: 900;
+            margin-bottom: 8vh; /* 3vh से बढ़ाकर 8vh - ज्यादा स्पेस */
+            line-height: 0.85; /* 0.8 से बढ़ाकर 0.85 */
+            color: #000000;
+            text-align: center;
+            letter-spacing: -6px; /* -8px से बढ़ाकर -6px */
+            transition: none;
+        }
+        
+        .battery-container {
+            position: relative;
+            width: 70vw;
+            max-width: 380px;
+            height: 35vw;
+            max-height: 190px;
+            border: 3px solid #000000;
+            border-radius: 12px;
+            background-color: #FFFFFF;
+            overflow: hidden;
+            margin-top: 15px; /* 5px से बढ़ाकर 15px - और स्पेस */
+        }
+        
+        .battery-level {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            bottom: 3px;
+            width: calc(var(--battery-level, 50%) - 6px);
+            background-color: #000000;
+            border-radius: 8px;
+            transition: all 0.5s ease;
+        }
+        
+        .battery-cap {
+            position: absolute;
+            right: -12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 10px;
+            height: 40px;
+            background-color: #000000;
+            border-radius: 0 5px 5px 0;
+        }
+        
+        .refresh-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            font-size: 13px;
+            color: #666;
+            font-family: monospace;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #eee;
+        }
+        
+        @media (max-width: 600px) {
+            body {
+                padding: 5px;
+            }
+            
+            .battery-percentage {
+                font-size: 54vw; /* 64vw से कम करके 54vw */
+                margin-bottom: 6vh; /* 2vh से बढ़ाकर 6vh */
+                letter-spacing: -4px; /* -6px से बढ़ाकर -4px */
+                line-height: 0.85; /* 0.75 से बढ़ाकर 0.85 */
+            }
+            
+            .battery-container {
+                width: 80vw;
+                height: 40vw;
+                border-width: 2.5px;
+                border-radius: 10px;
+                margin-top: 12px; /* 3px से बढ़ाकर 12px */
+            }
+            
+            .battery-level {
+                top: 2.5px;
+                left: 2.5px;
+                bottom: 2.5px;
+                width: calc(var(--battery-level, 50%) - 5px);
+                border-radius: 7px;
+            }
+            
+            .battery-cap {
+                right: -10px;
+                width: 8px;
+                height: 35px;
+                border-radius: 0 4px 4px 0;
+            }
+        }
+        
+        @media (max-width: 400px) {
+            .battery-percentage {
+                font-size: 60vw; /* 72vw से कम करके 60vw */
+                letter-spacing: -2px; /* -4px से बढ़ाकर -2px */
+                line-height: 0.85; /* 0.7 से बढ़ाकर 0.85 */
+            }
+            
+            .battery-container {
+                width: 90vw;
+                height: 45vw;
+                border-width: 2px;
+                border-radius: 8px;
+                margin-top: 10px; /* 2px से बढ़ाकर 10px */
+            }
+            
+            .battery-level {
+                top: 2px;
+                left: 2px;
+                bottom: 2px;
+                width: calc(var(--battery-level, 50%) - 4px);
+                border-radius: 6px;
+            }
+            
+            .battery-cap {
+                right: -8px;
+                width: 6px;
+                height: 30px;
+                border-radius: 0 3px 3px 0;
+            }
+        }
+        
+        /* नए कलर कोड के अनुसार CSS अपडेट */
+        /* 0-72%: लाल रंग */
+        .level-0-72 .battery-level {
+            background-color: #FF3B30 !important; /* लाल */
+        }
+        
+        /* 73-86%: नारंगी रंग */
+        .level-73-86 .battery-level {
+            background-color: #FF9500 !important; /* नारंगी */
+        }
+        
+        /* 87-100%: हरा रंग */
+        .level-87-100 .battery-level {
+            background-color: #34C759 !important; /* हरा */
+        }
+        
+        /* चार्जिंग के लिए - नीला रंग */
+        .charging .battery-level {
+            background-color: #007AFF !important; /* नीला */
+        }
+    </style>
+</head>
+<body>
+    <div class="battery-percentage" id="batteryPercent">--</div>
+    
+    <div class="battery-container" id="batteryContainer">
+        <div class="battery-level" id="batteryLevel"></div>
+        <div class="battery-cap"></div>
+    </div>
+    
+    <div class="refresh-indicator" id="refreshIndicator">4s</div>
+
+    <script>
+        const batteryPercent = document.getElementById('batteryPercent');
+        const batteryLevel = document.getElementById('batteryLevel');
+        const batteryContainer = document.getElementById('batteryContainer');
+        const refreshIndicator = document.getElementById('refreshIndicator');
+        
+        let refreshTimer = 4;
+        let refreshInterval;
+        let batteryUpdateInterval;
+        
+        // 4 सेकंड रिफ्रेश काउंटडाउन शुरू करें
+        function startRefreshCountdown() {
+            refreshTimer = 4;
+            refreshIndicator.textContent = `${refreshTimer}s`;
+            
+            clearInterval(refreshInterval);
+            refreshInterval = setInterval(() => {
+                refreshTimer--;
+                refreshIndicator.textContent = `${refreshTimer}s`;
+                
+                if (refreshTimer <= 0) {
+                    refreshTimer = 4;
+                    updateBatteryData();
+                }
+            }, 1000);
+        }
+        
+        // बैटरी डेटा अपडेट करें
+        function updateBatteryData() {
+            if ('getBattery' in navigator) {
+                navigator.getBattery().then(function(battery) {
+                    updateDisplay(battery);
+                    
+                    // बैटरी में बदलाव के लिए इवेंट लिसनर
+                    battery.addEventListener('levelchange', () => updateDisplay(battery));
+                    battery.addEventListener('chargingchange', () => updateDisplay(battery));
+                }).catch(error => {
+                    console.log("Battery API error:", error);
+                    showFallbackDisplay();
+                });
+            } else {
+                showFallbackDisplay();
+            }
+            
+            // काउंटडाउन रीसेट करें
+            startRefreshCountdown();
+        }
+        
+        // डिस्प्ले अपडेट करें (नए कलर कोड के अनुसार)
+        function updateDisplay(battery) {
+            const level = battery.level;
+            const percentage = Math.round(level * 100);
+            
+            // प्रतिशत दिखाएं (% चिन्ह के बिना)
+            batteryPercent.textContent = `${percentage}`;
+            
+            // बैटरी लेवल बार अपडेट करें
+            batteryLevel.style.setProperty('--battery-level', `${percentage}%`);
+            
+            // नए कलर कोड के अनुसार बैटरी लेवल बार के लिए रंग अपडेट करें
+            updateBatteryLevelColor(percentage, battery.charging);
+            
+            // चार्जिंग स्थिति के लिए क्लास
+            if (battery.charging) {
+                batteryContainer.classList.add('charging');
+                batteryContainer.classList.remove('level-0-72', 'level-73-86', 'level-87-100');
+            } else {
+                batteryContainer.classList.remove('charging');
+            }
+        }
+        
+        // नए कलर कोड के अनुसार बैटरी लेवल बार के लिए रंग अपडेट करें
+        function updateBatteryLevelColor(percentage, isCharging) {
+            // सभी रंग क्लासेस हटाएं
+            batteryContainer.classList.remove('level-0-72', 'level-73-86', 'level-87-100', 'charging');
+            
+            // चार्जिंग नहीं होने पर ही नियमित रंग लागू करें
+            if (!isCharging) {
+                if (percentage >= 87) {
+                    // 87-100%: हरा रंग
+                    batteryContainer.classList.add('level-87-100');
+                } else if (percentage >= 73) {
+                    // 73-86%: नारंगी रंग
+                    batteryContainer.classList.add('level-73-86');
+                } else {
+                    // 0-72%: लाल रंग
+                    batteryContainer.classList.add('level-0-72');
+                }
+            }
+        }
+        
+        // फॉलबैक डिस्प्ले
+        function showFallbackDisplay() {
+            // डेमो प्रतिशत
+            let demoPercentage = 70;
+            
+            function updateDemoDisplay() {
+                batteryPercent.textContent = `${demoPercentage}`;
+                batteryLevel.style.setProperty('--battery-level', `${demoPercentage}%`);
+                
+                // नए कलर कोड के अनुसार रंग अपडेट करें
+                updateBatteryLevelColor(demoPercentage, false);
+                
+                // अगला डेमो मान
+                demoPercentage += (Math.random() > 0.5 ? 5 : -5);
+                if (demoPercentage > 100) demoPercentage = 95;
+                if (demoPercentage < 0) demoPercentage = 5;
+            }
+            
+            updateDemoDisplay();
+            
+            // डेमो मोड में हर 4 सेकंड में बदलाव
+            clearInterval(batteryUpdateInterval);
+            batteryUpdateInterval = setInterval(updateDemoDisplay, 4000);
+        }
+        
+        // ऑटोमेटिक रिफ्रेश इंटरवल शुरू करें (हर 4 सेकंड)
+        function startAutoRefresh() {
+            clearInterval(batteryUpdateInterval);
+            batteryUpdateInterval = setInterval(updateBatteryData, 4000);
+        }
+        
+        // पेज लोड होने पर शुरू करें
+        window.addEventListener('load', function() {
+            updateBatteryData();
+            startAutoRefresh();
+            
+            // पृष्ठ दिखाई देने पर अपडेट करें
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    updateBatteryData();
+                }
+            });
+        });
+        
+        // ऑनलाइन होने पर अपडेट करें
+        window.addEventListener('online', function() {
+            updateBatteryData();
+        });
+        
+        // मैन्युअल अपडेट के लिए क्लिक इवेंट
+        document.addEventListener('click', function() {
+            updateBatteryData();
+        });
+    </script>
+</body>
+  </html>
